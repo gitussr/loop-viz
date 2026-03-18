@@ -1,0 +1,1473 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<meta name="theme-color" content="#050a0f">
+<meta name="description" content="Interactive for loop visualizer for beginners">
+<link rel="manifest" href="manifest.json">
+<title>LOOP // Visualizer</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:ital,wght@0,300;0,400;0,500;0,700;1,300&family=Orbitron:wght@400;700;900&display=swap" rel="stylesheet">
+<style>
+  :root {
+    --bg: #050a0f;
+    --bg1: #080f17;
+    --bg2: #0c1520;
+    --bg3: #111d2b;
+    --border: #1a2d42;
+    --border2: #1f3a55;
+    --cyan: #00e5ff;
+    --cyan-dim: #00e5ff44;
+    --cyan-glow: #00e5ff22;
+    --green: #00ff88;
+    --green-dim: #00ff8844;
+    --red: #ff3b5c;
+    --red-dim: #ff3b5c33;
+    --yellow: #ffd600;
+    --yellow-dim: #ffd60033;
+    --orange: #ff7700;
+    --purple: #b066ff;
+    --text: #c8d8e8;
+    --text-dim: #607080;
+    --text-bright: #e8f4ff;
+    --mono: 'JetBrains Mono', monospace;
+    --display: 'Orbitron', monospace;
+  }
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  html { height: 100%; }
+
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--mono);
+    min-height: 100vh;
+    overflow-x: hidden;
+  }
+
+  /* Scanlines overlay */
+  body::before {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background: repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0,0,0,0.07) 2px, rgba(0,0,0,0.07) 4px);
+    pointer-events: none;
+    z-index: 9999;
+  }
+
+  /* Grid background */
+  body::after {
+    content: '';
+    position: fixed;
+    inset: 0;
+    background-image:
+      linear-gradient(rgba(0,229,255,0.025) 1px, transparent 1px),
+      linear-gradient(90deg, rgba(0,229,255,0.025) 1px, transparent 1px);
+    background-size: 40px 40px;
+    pointer-events: none;
+    z-index: 0;
+  }
+
+  .app {
+    position: relative;
+    z-index: 1;
+    max-width: 1100px;
+    margin: 0 auto;
+    padding: 24px 16px 48px;
+  }
+
+  /* HEADER */
+  header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 32px;
+    padding-bottom: 20px;
+    border-bottom: 1px solid var(--border);
+  }
+
+  .logo {
+    font-family: var(--display);
+    font-size: clamp(18px, 4vw, 28px);
+    font-weight: 900;
+    letter-spacing: 0.1em;
+    color: var(--cyan);
+    text-shadow: 0 0 20px var(--cyan-dim), 0 0 40px var(--cyan-glow);
+  }
+
+  .logo span { color: var(--text-dim); font-weight: 400; }
+
+  .status-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 11px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .status-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--green);
+    box-shadow: 0 0 8px var(--green);
+    animation: pulse 2s ease-in-out infinite;
+  }
+
+  @keyframes pulse {
+    0%, 100% { opacity: 1; }
+    50% { opacity: 0.3; }
+  }
+
+  /* LAYOUT */
+  .grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 16px;
+  }
+
+  @media (max-width: 700px) {
+    .grid { grid-template-columns: 1fr; }
+  }
+
+  /* PANELS */
+  .panel {
+    background: var(--bg1);
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    overflow: hidden;
+    position: relative;
+  }
+
+  .panel::before {
+    content: '';
+    position: absolute;
+    top: 0; left: 0; right: 0;
+    height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan-dim), transparent);
+  }
+
+  .panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 16px;
+    background: var(--bg2);
+    border-bottom: 1px solid var(--border);
+  }
+
+  .panel-title {
+    font-family: var(--display);
+    font-size: 10px;
+    letter-spacing: 0.2em;
+    color: var(--cyan);
+    text-transform: uppercase;
+    font-weight: 700;
+  }
+
+  .panel-badge {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .panel-body { padding: 16px; }
+
+  /* FULL-WIDTH PANELS */
+  .full { grid-column: 1 / -1; }
+
+  /* CONFIG SECTION */
+  .config-grid {
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 12px;
+    margin-bottom: 16px;
+  }
+
+  @media (max-width: 480px) {
+    .config-grid { grid-template-columns: 1fr; }
+  }
+
+  .field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .field label {
+    font-size: 10px;
+    letter-spacing: 0.15em;
+    color: var(--text-dim);
+    text-transform: uppercase;
+  }
+
+  .field input, .field select {
+    background: var(--bg);
+    border: 1px solid var(--border2);
+    border-radius: 4px;
+    color: var(--cyan);
+    font-family: var(--mono);
+    font-size: 14px;
+    padding: 8px 10px;
+    outline: none;
+    transition: border-color 0.2s, box-shadow 0.2s;
+    width: 100%;
+  }
+
+  .field input:focus, .field select:focus {
+    border-color: var(--cyan);
+    box-shadow: 0 0 0 2px var(--cyan-glow);
+  }
+
+  .field input[type="number"]::-webkit-inner-spin-button { opacity: 0.3; }
+
+  /* TOGGLES */
+  .toggle-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 16px;
+  }
+
+  .toggle-item {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .toggle-item input[type="checkbox"] { display: none; }
+
+  .toggle-switch {
+    width: 36px; height: 20px;
+    border-radius: 10px;
+    background: var(--bg3);
+    border: 1px solid var(--border2);
+    position: relative;
+    transition: background 0.2s, border-color 0.2s;
+  }
+
+  .toggle-switch::after {
+    content: '';
+    position: absolute;
+    top: 3px; left: 3px;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--text-dim);
+    transition: transform 0.2s, background 0.2s;
+  }
+
+  .toggle-item input:checked + .toggle-switch {
+    border-color: var(--cyan);
+    background: var(--cyan-glow);
+  }
+
+  .toggle-item input:checked + .toggle-switch::after {
+    transform: translateX(16px);
+    background: var(--cyan);
+    box-shadow: 0 0 8px var(--cyan);
+  }
+
+  .toggle-label {
+    font-size: 12px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+  }
+
+  .toggle-label .kw {
+    color: var(--purple);
+    font-weight: 500;
+  }
+
+  /* BREAK/CONTINUE CONFIG */
+  .kw-config {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 16px;
+    padding: 12px;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    animation: fadeIn 0.2s ease;
+  }
+
+  .kw-config.show { display: grid; }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  /* CODE PREVIEW */
+  .code-block {
+    background: var(--bg);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 14px 16px;
+    font-size: 13px;
+    line-height: 1.8;
+    white-space: pre;
+    overflow-x: auto;
+  }
+
+  .kw { color: var(--purple); }
+  .num { color: var(--orange); }
+  .op { color: var(--cyan); }
+  .cmt { color: var(--text-dim); font-style: italic; }
+  .var { color: var(--green); }
+  .kw-break { color: var(--red); }
+  .kw-cont { color: var(--yellow); }
+  .hl-line {
+    background: var(--cyan-glow);
+    display: inline-block;
+    width: 100%;
+    border-left: 2px solid var(--cyan);
+    margin-left: -16px;
+    padding-left: 14px;
+  }
+
+  /* CONTROLS */
+  .controls {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+    flex-wrap: wrap;
+  }
+
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 4px;
+    font-family: var(--display);
+    font-size: 10px;
+    font-weight: 700;
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    cursor: pointer;
+    border: 1px solid;
+    transition: all 0.15s;
+    background: transparent;
+  }
+
+  .btn-primary {
+    border-color: var(--cyan);
+    color: var(--cyan);
+  }
+
+  .btn-primary:hover:not(:disabled) {
+    background: var(--cyan);
+    color: var(--bg);
+    box-shadow: 0 0 20px var(--cyan-dim);
+  }
+
+  .btn-secondary {
+    border-color: var(--border2);
+    color: var(--text-dim);
+  }
+
+  .btn-secondary:hover:not(:disabled) {
+    border-color: var(--text);
+    color: var(--text);
+  }
+
+  .btn-danger {
+    border-color: var(--red-dim);
+    color: var(--red);
+  }
+
+  .btn-danger:hover:not(:disabled) {
+    background: var(--red);
+    color: var(--bg);
+    box-shadow: 0 0 20px var(--red-dim);
+  }
+
+  .btn:disabled {
+    opacity: 0.3;
+    cursor: not-allowed;
+  }
+
+  /* SPEED */
+  .speed-control {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .speed-control label {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+  }
+
+  .speed-control input[type="range"] {
+    -webkit-appearance: none;
+    width: 80px; height: 2px;
+    background: var(--border2);
+    border-radius: 1px;
+    outline: none;
+  }
+
+  .speed-control input[type="range"]::-webkit-slider-thumb {
+    -webkit-appearance: none;
+    width: 12px; height: 12px;
+    border-radius: 50%;
+    background: var(--cyan);
+    box-shadow: 0 0 6px var(--cyan);
+    cursor: pointer;
+  }
+
+  /* VISUALIZATION AREA */
+  .viz-area {
+    min-height: 200px;
+    position: relative;
+  }
+
+  /* VARIABLES DISPLAY */
+  .vars-display {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+    min-height: 56px;
+    align-items: center;
+  }
+
+  .var-chip {
+    display: flex;
+    flex-direction: column;
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-radius: 4px;
+    padding: 8px 12px;
+    min-width: 80px;
+    position: relative;
+    transition: border-color 0.2s, box-shadow 0.2s;
+  }
+
+  .var-chip.active {
+    border-color: var(--cyan);
+    box-shadow: 0 0 12px var(--cyan-glow);
+  }
+
+  .var-chip.changed {
+    animation: chipChange 0.4s ease;
+  }
+
+  @keyframes chipChange {
+    0% { background: var(--cyan-glow); }
+    100% { background: var(--bg2); }
+  }
+
+  .var-chip-name {
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    margin-bottom: 2px;
+  }
+
+  .var-chip-val {
+    font-size: 20px;
+    color: var(--green);
+    font-weight: 500;
+    font-family: var(--display);
+  }
+
+  /* PHASE INDICATOR */
+  .phase-bar {
+    display: flex;
+    gap: 4px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+  }
+
+  .phase-step {
+    flex: 1;
+    min-width: 60px;
+    padding: 6px 4px;
+    text-align: center;
+    font-size: 9px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    border-radius: 3px;
+    border: 1px solid var(--border);
+    color: var(--text-dim);
+    transition: all 0.25s;
+  }
+
+  .phase-step.active {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: var(--cyan-glow);
+    box-shadow: 0 0 10px var(--cyan-glow);
+  }
+
+  .phase-step.done {
+    border-color: var(--border);
+    color: var(--text-dim);
+    background: var(--bg2);
+  }
+
+  .phase-step.break-active {
+    border-color: var(--red);
+    color: var(--red);
+    background: var(--red-dim);
+  }
+
+  .phase-step.continue-active {
+    border-color: var(--yellow);
+    color: var(--yellow);
+    background: var(--yellow-dim);
+  }
+
+  /* LOG */
+  .log-area {
+    min-height: 180px;
+    max-height: 260px;
+    overflow-y: auto;
+    font-size: 12px;
+    line-height: 2;
+  }
+
+  .log-area::-webkit-scrollbar { width: 4px; }
+  .log-area::-webkit-scrollbar-track { background: var(--bg); }
+  .log-area::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  .log-entry {
+    display: flex;
+    gap: 12px;
+    padding: 3px 0;
+    border-bottom: 1px solid var(--border);
+    animation: logSlide 0.2s ease;
+    align-items: flex-start;
+  }
+
+  @keyframes logSlide {
+    from { opacity: 0; transform: translateX(-6px); }
+    to { opacity: 1; transform: translateX(0); }
+  }
+
+  .log-iter {
+    color: var(--text-dim);
+    font-size: 10px;
+    min-width: 60px;
+    padding-top: 1px;
+  }
+
+  .log-msg { color: var(--text); flex: 1; }
+  .log-msg .lv { color: var(--text-dim); }
+  .log-msg .lv-val { color: var(--cyan); }
+  .log-msg .lv-break { color: var(--red); font-weight: 700; }
+  .log-msg .lv-cont { color: var(--yellow); font-weight: 700; }
+  .log-msg .lv-init { color: var(--green); }
+  .log-msg .lv-done { color: var(--purple); }
+  .log-msg .lv-cond { color: var(--orange); }
+  .log-msg .lv-upd { color: var(--purple); }
+
+  /* ITERATION TRACK */
+  .iter-track {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 4px 0;
+    min-height: 40px;
+  }
+
+  .iter-bubble {
+    width: 36px; height: 36px;
+    border-radius: 50%;
+    border: 1px solid var(--border2);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: var(--text-dim);
+    transition: all 0.3s;
+    position: relative;
+  }
+
+  .iter-bubble.current {
+    border-color: var(--cyan);
+    color: var(--cyan);
+    background: var(--cyan-glow);
+    box-shadow: 0 0 12px var(--cyan-dim);
+    animation: bubblePop 0.3s ease;
+  }
+
+  .iter-bubble.done-iter {
+    border-color: var(--green-dim);
+    color: var(--green);
+    background: rgba(0,255,136,0.07);
+  }
+
+  .iter-bubble.skipped {
+    border-color: var(--yellow-dim);
+    color: var(--yellow);
+    background: rgba(255,214,0,0.07);
+  }
+
+  .iter-bubble.broken {
+    border-color: var(--red-dim);
+    color: var(--red);
+    background: var(--red-dim);
+  }
+
+  @keyframes bubblePop {
+    0% { transform: scale(0.7); opacity: 0; }
+    70% { transform: scale(1.1); }
+    100% { transform: scale(1); opacity: 1; }
+  }
+
+  /* CONDITION RESULT */
+  .cond-result {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    border-radius: 3px;
+    font-size: 11px;
+    letter-spacing: 0.1em;
+    font-weight: 700;
+  }
+
+  .cond-result.true {
+    background: var(--green-dim);
+    color: var(--green);
+    border: 1px solid rgba(0,255,136,0.2);
+  }
+
+  .cond-result.false {
+    background: var(--red-dim);
+    color: var(--red);
+    border: 1px solid rgba(255,59,92,0.2);
+  }
+
+  /* EXPLANATION BOX */
+  .explain-box {
+    background: var(--bg2);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--cyan);
+    border-radius: 0 4px 4px 0;
+    padding: 12px 16px;
+    font-size: 12px;
+    line-height: 1.7;
+    color: var(--text);
+    min-height: 60px;
+    transition: border-left-color 0.3s;
+  }
+
+  .explain-box.phase-break { border-left-color: var(--red); }
+  .explain-box.phase-continue { border-left-color: var(--yellow); }
+  .explain-box.phase-done { border-left-color: var(--purple); }
+  .explain-box.phase-init { border-left-color: var(--green); }
+  .explain-box.phase-cond { border-left-color: var(--orange); }
+
+  /* EMPTY STATE */
+  .empty-state {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    min-height: 120px;
+    color: var(--text-dim);
+    font-size: 12px;
+    letter-spacing: 0.1em;
+    gap: 8px;
+  }
+
+  .empty-icon {
+    font-size: 28px;
+    opacity: 0.4;
+  }
+
+  /* LEGEND */
+  .legend {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.05em;
+    margin-top: 8px;
+  }
+
+  .legend-item {
+    display: flex;
+    align-items: center;
+    gap: 5px;
+  }
+
+  .legend-dot {
+    width: 10px; height: 10px;
+    border-radius: 50%;
+    border: 1px solid;
+  }
+
+  /* DIVIDER */
+  .divider {
+    height: 1px;
+    background: var(--border);
+    margin: 12px 0;
+  }
+
+  /* ERROR */
+  .error-msg {
+    color: var(--red);
+    font-size: 12px;
+    padding: 8px;
+    background: var(--red-dim);
+    border-radius: 4px;
+    border: 1px solid rgba(255,59,92,0.2);
+    margin-top: 8px;
+  }
+
+  /* Scrollbar global */
+  ::-webkit-scrollbar { width: 4px; height: 4px; }
+  ::-webkit-scrollbar-track { background: var(--bg); }
+  ::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+  /* Responsive tweaks */
+  @media (max-width: 480px) {
+    .controls { gap: 8px; }
+    .btn { padding: 8px 12px; font-size: 9px; }
+    .speed-control { margin-left: 0; width: 100%; }
+  }
+
+  /* Footer */
+  footer {
+    margin-top: 32px;
+    text-align: center;
+    font-size: 10px;
+    color: var(--text-dim);
+    letter-spacing: 0.15em;
+    padding-top: 20px;
+    border-top: 1px solid var(--border);
+    text-transform: uppercase;
+  }
+</style>
+</head>
+<body>
+<div class="app">
+
+  <header>
+    <div class="logo">LOOP<span> // </span>VIZ</div>
+    <div class="status-bar">
+      <div class="status-dot"></div>
+      <span id="statusText">READY</span>
+    </div>
+  </header>
+
+  <!-- CONFIG PANEL -->
+  <div class="panel full" style="margin-bottom:16px;">
+    <div class="panel-header">
+      <span class="panel-title">Configuration</span>
+      <span class="panel-badge">for ( init ; condition ; update )</span>
+    </div>
+    <div class="panel-body">
+
+      <div class="config-grid">
+        <div class="field">
+          <label>Init value (i = ?)</label>
+          <input type="number" id="initVal" value="0" min="-100" max="100">
+        </div>
+        <div class="field">
+          <label>Condition ( i ? limit )</label>
+          <select id="condOp">
+            <option value="<">i &lt; limit</option>
+            <option value="<=">i &lt;= limit</option>
+            <option value=">">i &gt; limit</option>
+            <option value=">=">i &gt;= limit</option>
+            <option value="!=">i != limit</option>
+          </select>
+        </div>
+        <div class="field">
+          <label>Limit value</label>
+          <input type="number" id="limitVal" value="5" min="-100" max="100">
+        </div>
+        <div class="field">
+          <label>Update type</label>
+          <select id="updateType">
+            <option value="++">i++ (increment by 1)</option>
+            <option value="--">i-- (decrement by 1)</option>
+            <option value="+=">i += step</option>
+            <option value="-=">i -= step</option>
+            <option value="*=">i *= step</option>
+          </select>
+        </div>
+        <div class="field" id="stepField" style="display:none;">
+          <label>Step value</label>
+          <input type="number" id="stepVal" value="2" min="-50" max="50">
+        </div>
+        <div class="field">
+          <label>Max iterations (safety)</label>
+          <input type="number" id="maxIter" value="20" min="1" max="100">
+        </div>
+      </div>
+
+      <!-- Opt-in toggles -->
+      <div class="toggle-row">
+        <label class="toggle-item">
+          <input type="checkbox" id="enableBreak">
+          <span class="toggle-switch"></span>
+          <span class="toggle-label">Enable <span class="kw">break</span></span>
+        </label>
+        <label class="toggle-item">
+          <input type="checkbox" id="enableContinue">
+          <span class="toggle-switch"></span>
+          <span class="toggle-label">Enable <span class="kw">continue</span></span>
+        </label>
+      </div>
+
+      <!-- Break / Continue config -->
+      <div class="kw-config" id="kwConfig">
+        <div class="field" id="breakCfg" style="display:none;">
+          <label>Break when i equals</label>
+          <input type="number" id="breakAt" value="3">
+        </div>
+        <div class="field" id="continueCfg" style="display:none;">
+          <label>Continue (skip) when i equals</label>
+          <input type="number" id="continueAt" value="2">
+        </div>
+      </div>
+
+      <div id="configError" class="error-msg" style="display:none;"></div>
+
+      <!-- Code preview -->
+      <div class="code-block" id="codePreview"></div>
+    </div>
+  </div>
+
+  <!-- MAIN GRID -->
+  <div class="grid">
+
+    <!-- Left: Controls + Phase + Variables -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Controls panel -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Execution</span>
+          <span class="panel-badge" id="iterCount">ITER: 0</span>
+        </div>
+        <div class="panel-body">
+          <div class="controls">
+            <button class="btn btn-primary" id="btnRun">▶ RUN</button>
+            <button class="btn btn-secondary" id="btnStep" disabled>⏭ STEP</button>
+            <button class="btn btn-danger" id="btnReset">↺ RESET</button>
+            <div class="speed-control">
+              <label>SPEED</label>
+              <input type="range" id="speedRange" min="100" max="2000" value="800" step="100">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Phase indicator -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Current Phase</span>
+        </div>
+        <div class="panel-body">
+          <div class="phase-bar" id="phaseBar">
+            <div class="phase-step" data-phase="init">INIT</div>
+            <div class="phase-step" data-phase="check">CHECK</div>
+            <div class="phase-step" data-phase="body">BODY</div>
+            <div class="phase-step" data-phase="update">UPDATE</div>
+            <div class="phase-step" data-phase="done">DONE</div>
+          </div>
+          <div class="explain-box" id="explainBox">
+            Configure your loop and press <strong>RUN</strong> or <strong>STEP</strong> to begin visualization.
+          </div>
+        </div>
+      </div>
+
+      <!-- Variables -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Variables</span>
+        </div>
+        <div class="panel-body">
+          <div class="vars-display" id="varsDisplay">
+            <div class="empty-state">
+              <div class="empty-icon">∅</div>
+              <span>Not running yet</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Right: Iteration track + Log -->
+    <div style="display:flex; flex-direction:column; gap:16px;">
+
+      <!-- Iteration bubbles -->
+      <div class="panel">
+        <div class="panel-header">
+          <span class="panel-title">Iteration Track</span>
+        </div>
+        <div class="panel-body">
+          <div class="iter-track" id="iterTrack">
+            <div class="empty-state" style="width:100%">
+              <div class="empty-icon">◎</div>
+              <span>Iterations appear here</span>
+            </div>
+          </div>
+          <div class="legend">
+            <div class="legend-item">
+              <div class="legend-dot" style="border-color:var(--cyan);background:var(--cyan-glow)"></div>
+              <span>Current</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="border-color:var(--green);background:rgba(0,255,136,0.07)"></div>
+              <span>Complete</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="border-color:var(--yellow);background:rgba(255,214,0,0.07)"></div>
+              <span>Skipped</span>
+            </div>
+            <div class="legend-item">
+              <div class="legend-dot" style="border-color:var(--red);background:var(--red-dim)"></div>
+              <span>Broken</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Log -->
+      <div class="panel" style="flex:1;">
+        <div class="panel-header">
+          <span class="panel-title">Execution Log</span>
+          <button class="btn btn-secondary" id="btnClearLog" style="padding:3px 10px;font-size:9px;">CLEAR</button>
+        </div>
+        <div class="panel-body" style="padding:8px 16px;">
+          <div class="log-area" id="logArea">
+            <div class="empty-state" style="min-height:120px;">
+              <div class="empty-icon">▷</div>
+              <span>Log will appear here</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>LOOP // VISUALIZER &nbsp;·&nbsp; FOR LOOP EDUCATOR &nbsp;·&nbsp; PWA READY</footer>
+
+</div>
+
+<script>
+// ─── STATE ───────────────────────────────────────────────────────────────────
+const state = {
+  running: false,
+  stepping: false,
+  phase: null,       // 'idle' | 'init' | 'check' | 'body' | 'update' | 'done'
+  i: 0,
+  iteration: 0,
+  finished: false,
+  timer: null,
+  pendingSteps: [],
+  stepMode: false,
+  iterBubbleStates: {}  // val -> 'current' | 'done' | 'skipped' | 'broken'
+};
+
+// ─── CONFIG READ ─────────────────────────────────────────────────────────────
+function getConfig() {
+  const init = parseInt(document.getElementById('initVal').value) || 0;
+  const limit = parseInt(document.getElementById('limitVal').value) || 5;
+  const condOp = document.getElementById('condOp').value;
+  const updateType = document.getElementById('updateType').value;
+  const stepVal = parseInt(document.getElementById('stepVal').value) || 2;
+  const maxIter = Math.max(1, Math.min(100, parseInt(document.getElementById('maxIter').value) || 20));
+  const enableBreak = document.getElementById('enableBreak').checked;
+  const enableContinue = document.getElementById('enableContinue').checked;
+  const breakAt = parseInt(document.getElementById('breakAt').value);
+  const continueAt = parseInt(document.getElementById('continueAt').value);
+  const speed = parseInt(document.getElementById('speedRange').value);
+  return { init, limit, condOp, updateType, stepVal, maxIter, enableBreak, enableContinue, breakAt, continueAt, speed };
+}
+
+// ─── VALIDATE ────────────────────────────────────────────────────────────────
+function validate(cfg) {
+  const errEl = document.getElementById('configError');
+  // Check for potential infinite loop
+  const { init, limit, condOp, updateType, stepVal, maxIter } = cfg;
+  // Detect clearly diverging configs
+  if ((condOp === '<' || condOp === '<=') && (updateType === '--' || updateType === '-=') && init < limit) {
+    errEl.textContent = '⚠ Warning: This configuration may loop forever (condition never met). Max iterations safety limit will stop it.';
+    errEl.style.display = 'block';
+    return true; // allow, safety limit handles it
+  }
+  if ((condOp === '>' || condOp === '>=') && (updateType === '++' || updateType === '+=') && init > limit) {
+    errEl.textContent = '⚠ Warning: This configuration may loop forever. Max iterations safety limit will stop it.';
+    errEl.style.display = 'block';
+    return true;
+  }
+  if ((updateType === '*=') && stepVal === 1) {
+    errEl.textContent = '⚠ Step value of 1 with *= will never progress. Max iterations will stop it.';
+    errEl.style.display = 'block';
+    return true;
+  }
+  errEl.style.display = 'none';
+  return true;
+}
+
+// ─── UPDATE FN ───────────────────────────────────────────────────────────────
+function applyUpdate(i, cfg) {
+  switch (cfg.updateType) {
+    case '++': return i + 1;
+    case '--': return i - 1;
+    case '+=': return i + cfg.stepVal;
+    case '-=': return i - cfg.stepVal;
+    case '*=': return i * cfg.stepVal;
+    default: return i + 1;
+  }
+}
+
+// ─── CONDITION ───────────────────────────────────────────────────────────────
+function checkCondition(i, cfg) {
+  switch (cfg.condOp) {
+    case '<':  return i < cfg.limit;
+    case '<=': return i <= cfg.limit;
+    case '>':  return i > cfg.limit;
+    case '>=': return i >= cfg.limit;
+    case '!=': return i !== cfg.limit;
+    default: return false;
+  }
+}
+
+// ─── CODE PREVIEW ────────────────────────────────────────────────────────────
+function getUpdateStr(cfg) {
+  switch (cfg.updateType) {
+    case '++': return 'i++';
+    case '--': return 'i--';
+    case '+=': return `i += ${cfg.stepVal}`;
+    case '-=': return `i -= ${cfg.stepVal}`;
+    case '*=': return `i *= ${cfg.stepVal}`;
+    default: return 'i++';
+  }
+}
+
+function buildCodePreview(cfg, highlightPhase) {
+  const upd = getUpdateStr(cfg);
+  const lines = [];
+
+  const hl = (line, ph) => {
+    if (highlightPhase && highlightPhase === ph) {
+      return `<span class="hl-line">${line}</span>`;
+    }
+    return line;
+  };
+
+  lines.push(`<span class="kw">for</span> (`);
+  lines.push(`  ` + hl(`<span class="var">i</span> <span class="op">=</span> <span class="num">${cfg.init}</span><span class="cmt">; // initialization</span>`, 'init'));
+  lines.push(`  ` + hl(`<span class="var">i</span> <span class="op">${cfg.condOp}</span> <span class="num">${cfg.limit}</span><span class="cmt">; // condition</span>`, 'check'));
+  lines.push(`  ` + hl(`<span class="var">${upd}</span><span class="cmt">  // update</span>`, 'update'));
+  lines.push(`) {`);
+  if (cfg.enableContinue) {
+    lines.push(`  ` + hl(`<span class="kw-cont">if</span> (<span class="var">i</span> <span class="op">===</span> <span class="num">${cfg.continueAt}</span>) <span class="kw-cont">continue</span><span class="cmt">; // skip</span>`, highlightPhase === 'continue' ? 'continue' : null));
+  }
+  if (cfg.enableBreak) {
+    lines.push(`  ` + hl(`<span class="kw-break">if</span> (<span class="var">i</span> <span class="op">===</span> <span class="num">${cfg.breakAt}</span>) <span class="kw-break">break</span><span class="cmt">;   // exit</span>`, highlightPhase === 'break' ? 'break' : null));
+  }
+  lines.push(`  ` + hl(`<span class="cmt">// body: i = ${state.phase ? state.i : '?'}</span>`, highlightPhase === 'body' ? 'body' : null));
+  lines.push(`}`);
+
+  document.getElementById('codePreview').innerHTML = lines.join('\n');
+}
+
+// ─── VARS DISPLAY ────────────────────────────────────────────────────────────
+function updateVarsDisplay(i, cfg, condResult) {
+  const el = document.getElementById('varsDisplay');
+  const condStr = `${i} ${cfg.condOp} ${cfg.limit}`;
+  el.innerHTML = `
+    <div class="var-chip active" id="chipI">
+      <div class="var-chip-name">i</div>
+      <div class="var-chip-val">${i}</div>
+    </div>
+    <div class="var-chip">
+      <div class="var-chip-name">limit</div>
+      <div class="var-chip-val">${cfg.limit}</div>
+    </div>
+    <div class="var-chip">
+      <div class="var-chip-name">condition</div>
+      <div class="var-chip-val" style="font-size:12px;padding-top:4px;">
+        ${condResult !== null
+          ? `<span class="cond-result ${condResult ? 'true' : 'false'}">${condStr} = ${condResult ? 'TRUE' : 'FALSE'}</span>`
+          : `<span style="color:var(--text-dim);font-size:12px;">${condStr}</span>`}
+      </div>
+    </div>
+    <div class="var-chip">
+      <div class="var-chip-name">iteration #</div>
+      <div class="var-chip-val">${state.iteration}</div>
+    </div>
+  `;
+  // Animate chip
+  setTimeout(() => {
+    const chip = document.getElementById('chipI');
+    if (chip) { chip.classList.add('changed'); setTimeout(() => chip.classList.remove('changed'), 500); }
+  }, 10);
+}
+
+// ─── ITER TRACK ──────────────────────────────────────────────────────────────
+function renderIterTrack() {
+  const el = document.getElementById('iterTrack');
+  const entries = Object.entries(state.iterBubbleStates);
+  if (entries.length === 0) {
+    el.innerHTML = `<div class="empty-state" style="width:100%"><div class="empty-icon">◎</div><span>Iterations appear here</span></div>`;
+    return;
+  }
+  el.innerHTML = entries.map(([val, st]) => {
+    let cls = '';
+    if (st === 'current') cls = 'current';
+    else if (st === 'done') cls = 'done-iter';
+    else if (st === 'skipped') cls = 'skipped';
+    else if (st === 'broken') cls = 'broken';
+    return `<div class="iter-bubble ${cls}">${val}</div>`;
+  }).join('');
+}
+
+// ─── PHASE BAR ───────────────────────────────────────────────────────────────
+function setPhase(phase) {
+  state.phase = phase;
+  document.querySelectorAll('.phase-step').forEach(el => {
+    el.classList.remove('active', 'done', 'break-active', 'continue-active');
+  });
+  const map = {
+    init: 'init', check: 'check', body: 'body', update: 'update',
+    done: 'done', break: 'body', continue: 'body'
+  };
+  const phaseOrder = ['init', 'check', 'body', 'update', 'done'];
+  const target = map[phase] || phase;
+  const idx = phaseOrder.indexOf(target);
+
+  document.querySelectorAll('.phase-step').forEach(el => {
+    const ph = el.dataset.phase;
+    const elIdx = phaseOrder.indexOf(ph);
+    if (ph === target) {
+      if (phase === 'break') el.classList.add('break-active');
+      else if (phase === 'continue') el.classList.add('continue-active');
+      else el.classList.add('active');
+    } else if (elIdx < idx) {
+      el.classList.add('done');
+    }
+  });
+}
+
+// ─── EXPLANATION ─────────────────────────────────────────────────────────────
+const EXPLANATIONS = {
+  idle: 'Configure your loop and press <strong>RUN</strong> or <strong>STEP</strong> to begin.',
+  init: (i) => `<strong>Initialization:</strong> Set <code style="color:var(--green)">i = ${i}</code>. This runs exactly once before the loop starts.`,
+  check: (i, cfg, result) => `<strong>Condition check:</strong> Is <code style="color:var(--orange)">${i} ${cfg.condOp} ${cfg.limit}</code>? → <span style="color:${result ? 'var(--green)' : 'var(--red)'}; font-weight:700">${result ? 'TRUE → enter body' : 'FALSE → exit loop'}</span>`,
+  body: (i) => `<strong>Loop body:</strong> Executing with <code style="color:var(--cyan)">i = ${i}</code>. Your code here runs each iteration.`,
+  update: (i, cfg) => `<strong>Update step:</strong> Apply <code style="color:var(--purple)">${getUpdateStr(cfg)}</code>. Value changes from <code style="color:var(--orange)">${i}</code> to <code style="color:var(--cyan)">${applyUpdate(i, cfg)}</code>.`,
+  break: (i, cfg) => `<strong style="color:var(--red)">BREAK!</strong> Condition <code>i === ${cfg.breakAt}</code> is true with <code>i = ${i}</code>. Loop exits immediately — no more iterations.`,
+  continue: (i, cfg) => `<strong style="color:var(--yellow)">CONTINUE!</strong> Condition <code>i === ${cfg.continueAt}</code> is true with <code>i = ${i}</code>. Skip body, jump to update step.`,
+  done: (n) => `<strong style="color:var(--purple)">Loop complete!</strong> Finished ${n} iteration${n !== 1 ? 's' : ''}. The condition became false, so execution continues after the loop.`,
+};
+
+function setExplain(phase, ...args) {
+  const el = document.getElementById('explainBox');
+  el.className = 'explain-box';
+  if (phase === 'init') el.classList.add('phase-init');
+  else if (phase === 'check') el.classList.add('phase-cond');
+  else if (phase === 'break') el.classList.add('phase-break');
+  else if (phase === 'continue') el.classList.add('phase-continue');
+  else if (phase === 'done') el.classList.add('phase-done');
+  const fn = EXPLANATIONS[phase];
+  el.innerHTML = typeof fn === 'function' ? fn(...args) : fn;
+}
+
+// ─── LOG ─────────────────────────────────────────────────────────────────────
+let logEmpty = true;
+function addLog(phase, msg, iteration) {
+  const el = document.getElementById('logArea');
+  if (logEmpty) { el.innerHTML = ''; logEmpty = false; }
+  const entry = document.createElement('div');
+  entry.className = 'log-entry';
+  const iterLabel = iteration !== undefined ? `ITER ${iteration}` : 'SETUP';
+  const cls = {
+    init: 'lv-init', check: 'lv-cond', body: 'lv-val', update: 'lv-upd',
+    break: 'lv-break', continue: 'lv-cont', done: 'lv-done'
+  }[phase] || 'lv';
+  entry.innerHTML = `
+    <div class="log-iter">${iterLabel}</div>
+    <div class="log-msg"><span class="${cls}">${msg}</span></div>
+  `;
+  el.appendChild(entry);
+  el.scrollTop = el.scrollHeight;
+}
+
+// ─── STATUS ───────────────────────────────────────────────────────────────────
+function setStatus(text) {
+  document.getElementById('statusText').textContent = text;
+}
+
+function setIterCount(n) {
+  document.getElementById('iterCount').textContent = `ITER: ${n}`;
+}
+
+// ─── STEP GENERATOR ──────────────────────────────────────────────────────────
+function* loopStepGen(cfg) {
+  // INIT
+  let i = cfg.init;
+  state.i = i;
+  state.iteration = 0;
+  state.iterBubbleStates = {};
+  yield { phase: 'init', i, log: `Initialize: i = ${i}`, condResult: null };
+
+  let safetyCount = 0;
+
+  while (true) {
+    if (safetyCount++ >= cfg.maxIter) {
+      yield { phase: 'done', i, log: `Safety limit (${cfg.maxIter} iterations) reached. Loop stopped.`, condResult: null, forced: true };
+      return;
+    }
+
+    // CHECK
+    const condResult = checkCondition(i, cfg);
+    yield { phase: 'check', i, condResult, log: `Condition: ${i} ${cfg.condOp} ${cfg.limit} → ${condResult ? 'TRUE' : 'FALSE'}` };
+
+    if (!condResult) {
+      yield { phase: 'done', i, log: `Condition false. Loop ends after ${state.iteration} iteration(s).`, condResult: null };
+      return;
+    }
+
+    state.iteration++;
+    state.iterBubbleStates[i] = 'current';
+
+    // CONTINUE check
+    if (cfg.enableContinue && i === cfg.continueAt) {
+      yield { phase: 'continue', i, condResult: null, log: `CONTINUE triggered (i === ${cfg.continueAt}). Skipping body.` };
+      state.iterBubbleStates[i] = 'skipped';
+      const newI = applyUpdate(i, cfg);
+      i = newI;
+      state.i = i;
+      yield { phase: 'update', i, condResult: null, log: `Update: ${getUpdateStr(cfg)} → i = ${i}` };
+      continue;
+    }
+
+    // BREAK check
+    if (cfg.enableBreak && i === cfg.breakAt) {
+      yield { phase: 'break', i, condResult: null, log: `BREAK triggered (i === ${cfg.breakAt}). Exiting loop.` };
+      state.iterBubbleStates[i] = 'broken';
+      renderIterTrack();
+      yield { phase: 'done', i, log: `Loop exited via break after ${state.iteration} iteration(s).`, condResult: null };
+      return;
+    }
+
+    // BODY
+    yield { phase: 'body', i, condResult: null, log: `Body executes with i = ${i}` };
+    state.iterBubbleStates[i] = 'done';
+
+    // UPDATE
+    const newI = applyUpdate(i, cfg);
+    i = newI;
+    state.i = i;
+    yield { phase: 'update', i, condResult: null, log: `Update: ${getUpdateStr(cfg)} → i = ${i}` };
+  }
+}
+
+// ─── PROCESS ONE STEP ────────────────────────────────────────────────────────
+function processStep(stepData, cfg) {
+  const { phase, i, condResult, log, forced } = stepData;
+
+  setPhase(phase);
+  setExplain(phase,
+    phase === 'init' ? i :
+    phase === 'check' ? i : i,
+    cfg, condResult !== undefined ? condResult : null,
+    state.iteration
+  );
+  // Rebuild explain with right args
+  if (phase === 'init') setExplain('init', i);
+  else if (phase === 'check') setExplain('check', i, cfg, condResult);
+  else if (phase === 'body') setExplain('body', i);
+  else if (phase === 'update') {
+    const prevI = state.i; // already updated above
+    setExplain('update', applyUpdate(i, cfg) !== i ? applyUpdate(i, cfg) : i - (cfg.updateType === '++' ? 1 : cfg.updateType === '--' ? -1 : cfg.stepVal || 2), cfg);
+    // Actually we want to show "from old to new", but state.i is already new.
+    // Recalculate for display:
+    setExplain('update', i, cfg);
+  }
+  else if (phase === 'break') setExplain('break', i, cfg);
+  else if (phase === 'continue') setExplain('continue', i, cfg);
+  else if (phase === 'done') setExplain('done', state.iteration);
+
+  updateVarsDisplay(i, cfg, condResult !== undefined ? condResult : null);
+  renderIterTrack();
+  buildCodePreview(cfg, phase);
+  addLog(phase, log, phase === 'init' ? undefined : state.iteration);
+  setIterCount(state.iteration);
+
+  if (phase === 'done' || phase === 'break') {
+    endExecution(forced);
+  }
+}
+
+function endExecution(forced) {
+  state.running = false;
+  state.finished = true;
+  clearTimeout(state.timer);
+  setStatus(forced ? 'STOPPED (LIMIT)' : 'COMPLETE');
+  document.getElementById('btnRun').textContent = '▶ RUN';
+  document.getElementById('btnStep').disabled = true;
+  document.getElementById('btnRun').disabled = false;
+}
+
+// ─── RUN MODE ────────────────────────────────────────────────────────────────
+function runNext() {
+  if (!state.gen) return;
+  const cfg = getConfig();
+  const { value, done } = state.gen.next();
+  if (done || !value) {
+    endExecution(false);
+    return;
+  }
+  processStep(value, cfg);
+  if (state.running && !state.finished) {
+    const delay = 2200 - parseInt(document.getElementById('speedRange').value);
+    state.timer = setTimeout(runNext, Math.max(100, delay));
+  }
+}
+
+// ─── BUTTON HANDLERS ─────────────────────────────────────────────────────────
+document.getElementById('btnRun').addEventListener('click', () => {
+  const cfg = getConfig();
+  if (!validate(cfg)) return;
+
+  if (state.running) {
+    // Pause
+    state.running = false;
+    clearTimeout(state.timer);
+    setStatus('PAUSED');
+    document.getElementById('btnRun').textContent = '▶ RESUME';
+    document.getElementById('btnStep').disabled = false;
+    return;
+  }
+
+  if (state.finished || !state.gen) {
+    // Fresh start
+    resetState();
+    state.gen = loopStepGen(cfg);
+    logEmpty = true;
+    document.getElementById('logArea').innerHTML = '';
+  }
+
+  state.running = true;
+  state.stepMode = false;
+  setStatus('RUNNING');
+  document.getElementById('btnRun').textContent = '⏸ PAUSE';
+  document.getElementById('btnStep').disabled = true;
+
+  runNext();
+});
+
+document.getElementById('btnStep').addEventListener('click', () => {
+  if (!state.gen) {
+    const cfg = getConfig();
+    if (!validate(cfg)) return;
+    resetState();
+    state.gen = loopStepGen(cfg);
+    logEmpty = true;
+    document.getElementById('logArea').innerHTML = '';
+  }
+  if (state.finished) return;
+  state.running = false;
+  state.stepMode = true;
+  clearTimeout(state.timer);
+  document.getElementById('btnRun').textContent = '▶ RESUME';
+  document.getElementById('btnStep').disabled = false;
+  setStatus('STEPPING');
+
+  const cfg = getConfig();
+  const { value, done } = state.gen.next();
+  if (done || !value) { endExecution(false); return; }
+  processStep(value, cfg);
+  if (!state.finished) document.getElementById('btnStep').disabled = false;
+});
+
+document.getElementById('btnReset').addEventListener('click', () => {
+  clearTimeout(state.timer);
+  resetState();
+  const cfg = getConfig();
+  buildCodePreview(cfg, null);
+  document.getElementById('logArea').innerHTML = `<div class="empty-state" style="min-height:120px;"><div class="empty-icon">▷</div><span>Log will appear here</span></div>`;
+  document.getElementById('iterTrack').innerHTML = `<div class="empty-state" style="width:100%"><div class="empty-icon">◎</div><span>Iterations appear here</span></div>`;
+  document.getElementById('varsDisplay').innerHTML = `<div class="empty-state"><div class="empty-icon">∅</div><span>Not running yet</span></div>`;
+  document.getElementById('explainBox').className = 'explain-box';
+  document.getElementById('explainBox').innerHTML = 'Configure your loop and press <strong>RUN</strong> or <strong>STEP</strong> to begin visualization.';
+  document.querySelectorAll('.phase-step').forEach(el => el.classList.remove('active', 'done', 'break-active', 'continue-active'));
+  setStatus('READY');
+  setIterCount(0);
+  document.getElementById('btnRun').textContent = '▶ RUN';
+  document.getElementById('btnRun').disabled = false;
+  document.getElementById('btnStep').disabled = false;
+  logEmpty = true;
+});
+
+document.getElementById('btnClearLog').addEventListener('click', () => {
+  document.getElementById('logArea').innerHTML = `<div class="empty-state" style="min-height:120px;"><div class="empty-icon">▷</div><span>Log will appear here</span></div>`;
+  logEmpty = true;
+});
+
+function resetState() {
+  clearTimeout(state.timer);
+  state.running = false;
+  state.finished = false;
+  state.phase = null;
+  state.i = 0;
+  state.iteration = 0;
+  state.gen = null;
+  state.iterBubbleStates = {};
+}
+
+// ─── LIVE CONFIG UPDATES ──────────────────────────────────────────────────────
+function onConfigChange() {
+  const cfg = getConfig();
+  validate(cfg);
+  buildCodePreview(cfg, null);
+  // Show/hide step field
+  const needs = ['+=', '-=', '*='].includes(cfg.updateType);
+  document.getElementById('stepField').style.display = needs ? 'block' : 'none';
+}
+
+['initVal', 'limitVal', 'condOp', 'updateType', 'stepVal', 'maxIter', 'breakAt', 'continueAt'].forEach(id => {
+  document.getElementById(id).addEventListener('input', onConfigChange);
+  document.getElementById(id).addEventListener('change', onConfigChange);
+});
+
+// ─── TOGGLE KEYWORDS ──────────────────────────────────────────────────────────
+function updateKwConfig() {
+  const breakOn = document.getElementById('enableBreak').checked;
+  const contOn = document.getElementById('enableContinue').checked;
+  const kwConfig = document.getElementById('kwConfig');
+  document.getElementById('breakCfg').style.display = breakOn ? 'block' : 'none';
+  document.getElementById('continueCfg').style.display = contOn ? 'block' : 'none';
+  kwConfig.classList.toggle('show', breakOn || contOn);
+  onConfigChange();
+}
+
+document.getElementById('enableBreak').addEventListener('change', updateKwConfig);
+document.getElementById('enableContinue').addEventListener('change', updateKwConfig);
+
+// ─── PWA SERVICE WORKER ───────────────────────────────────────────────────────
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('sw.js').catch(() => {});
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+onConfigChange();
+</script>
+</body>
+</html>
