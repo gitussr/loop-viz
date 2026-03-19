@@ -1,0 +1,20 @@
+{
+  "name": "LOOP // Visualizer",
+  "short_name": "LOOP VIZ",
+  "description": "Interactive for loop visualizer for beginners",
+  "start_url": "./index.html",
+  "display": "standalone",
+  "background_color": "#050a0f",
+  "theme_color": "#050a0f",
+  "orientation": "any",
+  "icons": [
+    {
+      "src": "icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ],
+  "categories": ["education", "developer tools"],
+  "lang": "en"
+}
